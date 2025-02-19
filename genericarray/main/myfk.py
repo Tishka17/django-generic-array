@@ -36,10 +36,6 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
         # GenericForeignKey is its own descriptor.
         setattr(cls, self.attname, self)
 
-    def get_attname_column(self):
-        attname, column = super().get_attname_column()
-        return attname, None
-
     @cached_property
     def cache_name(self):
         return self.name
@@ -58,37 +54,24 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
         # type, id
         return termination
 
-    def get_content_type(self, obj=None, id=None, using=None, model=None):
-        if obj is not None:
-            return ContentType.objects.db_manager(obj._state.db).get_for_model(
-                obj, for_concrete_model=self.for_concrete_model
-            )
-        elif id is not None:
-            return ContentType.objects.db_manager(using).get_for_id(id)
-        elif model is not None:
-            return ContentType.objects.db_manager(using).get_for_model(
-                model, for_concrete_model=self.for_concrete_model
-            )
-        else:
-            # This should never happen. I love comments like this, don't you?
-            raise Exception("Impossible arguments to GFK.get_content_type!")
+    def get_content_type_by_id(self, id=None, using=None):
+        return ContentType.objects.db_manager(using).get_for_id(id)
 
-    def get_prefetch_queryset(self, instances, queryset=None):
-        warnings.warn(
-            "get_prefetch_queryset() is deprecated. Use get_prefetch_querysets() "
-            "instead.",
-            RemovedInDjango60Warning,
-            stacklevel=2,
+    def get_content_type_of_obj(self, obj=None):
+        return ContentType.objects.db_manager(obj._state.db).get_for_model(
+            obj, for_concrete_model=self.for_concrete_model
         )
-        if queryset is None:
-            return self.get_prefetch_querysets(instances)
-        return self.get_prefetch_querysets(instances, [queryset])
+
+    def get_content_type_for_model(self, using=None, model=None):
+        return ContentType.objects.db_manager(using).get_for_model(
+            model, for_concrete_model=self.for_concrete_model
+        )
 
     def get_prefetch_querysets(self, instances, querysets=None):
         custom_queryset_dict = {}
         if querysets is not None:
             for queryset in querysets:
-                ct_id = self.get_content_type(
+                ct_id = self.get_content_type_for_model(
                     model=queryset.query.model, using=queryset.db
                 ).pk
                 if ct_id in custom_queryset_dict:
@@ -102,53 +85,41 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
         fk_dict = defaultdict(set)
         # We need one instance for each group in order to get the right db:
         instance_dict = defaultdict(list)
-        ct_attname = self.model._meta.get_field(self.field).attname
         for instance in instances:
             for ct_id, fk_val in self._get_ids(instance):
                 fk_dict[ct_id].add(fk_val)
                 instance_dict[ct_id].append(instance)
 
-        ret_val = []
+        rel_objects = []
         for ct_id, fkeys in fk_dict.items():
             if ct_id in custom_queryset_dict:
                 # Return values from the custom queryset, if provided.
-                ret_val.extend(custom_queryset_dict[ct_id].filter(pk__in=fkeys))
+                rel_objects.extend(custom_queryset_dict[ct_id].filter(pk__in=fkeys))
             else:
                 # FIXME
                 instance = instance_dict[ct_id]
-                ct = self.get_content_type(id=ct_id, using=instance._state.db)
-                ret_val.extend(ct.get_all_objects_for_this_type(pk__in=fkeys))
+                ct = self.get_content_type_by_id(id=ct_id, using=instance._state.db)
+                rel_objects.extend(ct.get_all_objects_for_this_type(pk__in=fkeys))
 
-        def gfk_inst(obj):
-            return lists_keys[id(obj)]
-
-        def gfk_key(obj):
-            ct_id = getattr(obj, ct_attname)
-            if ct_id is None:
-                return None
-            else:
-                result = tuple(sorted(map(tuple, self._get_ids(instance))))
-                return result
-
-        to_store = defaultdict(list)
+        # reorganize objects to fix usage
+        items = {
+            (self.get_content_type_of_obj(obj=rel_obj).pk, rel_obj.pk, rel_obj._state.db): rel_obj
+            for rel_obj in rel_objects
+        }
         lists = []
         lists_keys = {}
         for instance in instances:
             data = []
             lists.append(data)
-            lists_keys[id(data)] = gfk_key(instance)
+            lists_keys[instance] = id(data)
             for ct, fk in self._get_ids(instance):
-                to_store[ct, fk].append(data)
-
-        for rel_obj in ret_val:
-            ct = self.get_content_type(obj=rel_obj).pk
-            for data in to_store[ct, rel_obj.pk]:
-                data.append(rel_obj)
+                if rel_obj := items.get((ct, fk, instance._state.db)):
+                    data.append(rel_obj)
 
         return (
             lists,
-            gfk_inst,
-            gfk_key,
+            lambda obj: id(obj),
+            lambda obj: lists_keys[obj],
             True,
             self.cache_name,
             True,
@@ -161,4 +132,3 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
 
     def __set__(self, instance, value):
         instance.__dict__[self.name] = value
-        return

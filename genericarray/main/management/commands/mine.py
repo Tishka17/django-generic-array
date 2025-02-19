@@ -17,13 +17,13 @@ def add():
     b2 = B(id=2, title="B2", desc="b2", a=aforb)
     b2.save(force_insert=True)
 
-    c = C(id=1, title="C1", termination=b1)
+    c = C(id=1, title="C0", termination=b1)
     c.data = [[[c.type.id, c.fk]]]
     c.save(force_insert=True)
     c1 = C(id=2, title="C1", termination=b2)
     c1.data = [[[c.type.id, c.fk], [c1.type.id, c1.fk]]]
     c1.save(force_insert=True)
-    c2 = C(id=3, title="C1", termination=a)
+    c2 = C(id=3, title="C2", termination=a)
     c2.data = [[[c2.type.id, c2.fk], [c1.type.id, c1.fk]]]
     c2.save(force_insert=True)
 
@@ -46,6 +46,7 @@ def read():
     print("iterate")
     for c in cs:
         print("~~~", c.id, c.title)
+        print(c.data)
         # print("C: ", c.fk, c.termination)
         # print("TA:", getattr(c.termination, "a", "-"))
         print("Data found:")
