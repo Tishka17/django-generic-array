@@ -1,11 +1,9 @@
 import json
-import warnings
 from collections import defaultdict
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.fields import Field
 from django.db.models.fields.mixins import FieldCacheMixin
-from django.utils.deprecation import RemovedInDjango60Warning
 from django.utils.functional import cached_property
 
 
@@ -82,23 +80,17 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
 
         # For efficiency, group the instances by content type and then do one
         # query per model
-        fk_dict = defaultdict(set)
-        # We need one instance for each group in order to get the right db:
-        instance_dict = defaultdict(list)
+        fk_dict = defaultdict(set)  # type id, db -> model ids
         for instance in instances:
             for ct_id, fk_val in self._get_ids(instance):
-                fk_dict[ct_id].add(fk_val)
-                instance_dict[ct_id].append(instance)
+                fk_dict[(ct_id, instance._state.db)].add(fk_val)
 
         rel_objects = []
-        for ct_id, fkeys in fk_dict.items():
+        for (ct_id, db), fkeys in fk_dict.items():
             if ct_id in custom_queryset_dict:
-                # Return values from the custom queryset, if provided.
                 rel_objects.extend(custom_queryset_dict[ct_id].filter(pk__in=fkeys))
             else:
-                # FIXME
-                instance = instance_dict[ct_id]
-                ct = self.get_content_type_by_id(id=ct_id, using=instance._state.db)
+                ct = self.get_content_type_by_id(id=ct_id, using=db)
                 rel_objects.extend(ct.get_all_objects_for_this_type(pk__in=fkeys))
 
         # reorganize objects to fix usage
