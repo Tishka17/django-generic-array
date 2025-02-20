@@ -8,13 +8,9 @@ from django.db.models.fields.mixins import FieldCacheMixin
 from django.utils.functional import cached_property
 
 
-class TerminationGenericForeignKey(FieldCacheMixin, Field):
+class GenericArrayForeignKey(FieldCacheMixin, Field):
     """
-    Provide a generic many-to-one relation through the ``content_type`` and
-    ``object_id`` fields.
-
-    This class also doubles as an accessor to the related object (similar to
-    ForwardManyToOneDescriptor) by adding itself as a model attribute.
+    Provide a generic many-to-many relation through an array field
     """
 
     many_to_many = True
@@ -22,9 +18,7 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
     one_to_many = False
     one_to_one = False
 
-    def __init__(
-            self, field, for_concrete_model=True
-    ):
+    def __init__(self, field, for_concrete_model=True):
         super().__init__(editable=False)
         self.field = field
         self.for_concrete_model = for_concrete_model
@@ -122,18 +116,19 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
         if instance is None:
             return self
         rel_objects = self.get_cached_value(instance, default=None)
-        if rel_objects is None and self.is_cached(instance):
-            return rel_objects
+        expected_ids = self._get_ids(instance)
         #check cache actual
         if rel_objects is not None:
-            expected = self._get_ids(instance)
             actual = [
                 [self.get_content_type_of_obj(obj=item).id, item.pk]
                 for item in rel_objects
             ]
-            if expected == actual:
+            if expected_ids == actual:
                 return rel_objects
         # reload value
+        if expected_ids is None:
+            self.set_cached_value(instance, rel_objects)
+            return rel_objects
         rel_objects = []
         for ct_id, pk_val in self._get_ids(instance):
             ct = self.get_content_type_by_id(id=ct_id, using=instance._state.db)

@@ -2,7 +2,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 
 
-from main.myfk import TerminationGenericForeignKey
+from main.myfk import GenericArrayForeignKey
 
 
 # Create your models here.
@@ -29,7 +29,7 @@ class C(models.Model):
         ct_field='type',
         fk_field='fk'
     )
-    my = TerminationGenericForeignKey(
+    my = GenericArrayForeignKey(
         field="data"
     )
 
