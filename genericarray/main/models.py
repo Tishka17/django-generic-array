@@ -1,6 +1,7 @@
+import json
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
-
 
 from main.myfk import GenericArrayForeignKey
 
@@ -29,8 +30,16 @@ class C(models.Model):
         ct_field='type',
         fk_field='fk'
     )
-    my = GenericArrayForeignKey(
-        field="data"
-    )
-
     data = models.CharField(max_length=1000)
+
+    @property
+    def data_unpacked(self):
+        return json.loads(self.data)
+
+    @data_unpacked.setter
+    def data_unpacked(self, data):
+        self.data = json.dumps(data)
+
+    my = GenericArrayForeignKey(
+        field="data_unpacked"
+    )

@@ -18,13 +18,13 @@ def add():
     b2.save(force_insert=True)
 
     c = C(id=1, title="C0", termination=b1)
-    c.data = [[[c.type.id, c.fk]]]
+    c.data_unpacked = [[c.type.id, c.fk]]
     c.save(force_insert=True)
     c1 = C(id=2, title="C1", termination=b2)
-    c1.data = [[[c.type.id, c.fk], [c1.type.id, c1.fk]]]
+    c1.data_unpacked = [[c.type.id, c.fk], [c1.type.id, c1.fk]]
     c1.save(force_insert=True)
     c2 = C(id=3, title="C2", termination=a)
-    c2.data = [[[c2.type.id, c2.fk], [c1.type.id, c1.fk]]]
+    c2.data_unpacked = [[c2.type.id, c2.fk], [c1.type.id, c1.fk]]
     c2.save(force_insert=True)
 
 

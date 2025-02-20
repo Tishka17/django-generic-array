@@ -1,4 +1,3 @@
-import json
 from collections import defaultdict
 
 from django.contrib.contenttypes.models import ContentType
@@ -33,19 +32,11 @@ class GenericArrayForeignKey(FieldCacheMixin, Field):
     def cache_name(self):
         return self.name
 
+    def get_cache_name(self):
+        return self.name
+
     def _get_ids(self, instance):
-        ct_attname = self.model._meta.get_field(self.field).attname
-        related = getattr(instance, ct_attname)
-        if not related:
-            return []
-        related = json.loads(related)
-        if not related:
-            return []
-        termination = related[-1]
-        if not termination:
-            return []
-        # type, id
-        return termination
+        return getattr(instance, self.field)
 
     def get_content_type_by_id(self, id=None, using=None):
         return ContentType.objects.db_manager(using).get_for_id(id)
@@ -117,7 +108,7 @@ class GenericArrayForeignKey(FieldCacheMixin, Field):
             return self
         rel_objects = self.get_cached_value(instance, default=None)
         expected_ids = self._get_ids(instance)
-        #check cache actual
+        # check cache actual
         if rel_objects is not None:
             actual = [
                 [self.get_content_type_of_obj(obj=item).id, item.pk]
