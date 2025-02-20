@@ -16,7 +16,7 @@ class GenericPrefetch(Prefetch):
                     "Prefetch querysets cannot use raw(), values(), and values_list()."
                 )
         self.querysets = querysets
-        super().__init__(lookup, to_attr=to_attr)
+        super().__init__(lookup, to_attr=to_attr, queryset=querysets)
 
     def __getstate__(self):
         obj_dict = self.__dict__.copy()

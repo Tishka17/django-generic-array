@@ -51,6 +51,11 @@ class GenericArrayForeignKey(FieldCacheMixin, Field):
             model, for_concrete_model=self.for_concrete_model
         )
 
+    # hack fo 4.2
+    def get_prefetch_queryset(self, instances, queryset=None):
+        print(instances, queryset)
+        return self.get_prefetch_querysets(instances, queryset)
+
     def get_prefetch_querysets(self, instances, querysets=None):
         custom_queryset_dict = {}
         if querysets is not None:
@@ -124,9 +129,7 @@ class GenericArrayForeignKey(FieldCacheMixin, Field):
         for ct_id, pk_val in self._get_ids(instance):
             ct = self.get_content_type_by_id(id=ct_id, using=instance._state.db)
             try:
-                rel_obj = ct.get_object_for_this_type(
-                    using=instance._state.db, pk=pk_val
-                )
+                rel_obj = ct.get_object_for_this_type(pk=pk_val)
                 rel_objects.append(rel_obj)
             except ObjectDoesNotExist:
                 print("__get__ ObjectDoesNotExist", ct_id, pk_val)

@@ -1,7 +1,10 @@
 from django.core.management import BaseCommand
 from django.db import transaction
 
-from main.genprefetch import GenericPrefetch
+try:
+    from django.contrib.contenttypes.prefetch import GenericPrefetch
+except ImportError:
+    from main.genprefetch import GenericPrefetch
 from main.models import A, B, C
 
 
