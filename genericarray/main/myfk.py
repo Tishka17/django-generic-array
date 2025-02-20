@@ -2,6 +2,7 @@ import json
 from collections import defaultdict
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.fields import Field
 from django.db.models.fields.mixins import FieldCacheMixin
 from django.utils.functional import cached_property
@@ -114,13 +115,38 @@ class TerminationGenericForeignKey(FieldCacheMixin, Field):
             lambda obj: lists_keys[obj],
             True,
             self.cache_name,
-            True,
+            False,
         )
 
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
-        return instance.__dict__[self.name]
+        rel_objects = self.get_cached_value(instance, default=None)
+        if rel_objects is None and self.is_cached(instance):
+            return rel_objects
+        #check cache actual
+        if rel_objects is not None:
+            expected = self._get_ids(instance)
+            actual = [
+                [self.get_content_type_of_obj(obj=item).id, item.pk]
+                for item in rel_objects
+            ]
+            if expected == actual:
+                return rel_objects
+        # reload value
+        rel_objects = []
+        for ct_id, pk_val in self._get_ids(instance):
+            ct = self.get_content_type_by_id(id=ct_id, using=instance._state.db)
+            try:
+                rel_obj = ct.get_object_for_this_type(
+                    using=instance._state.db, pk=pk_val
+                )
+                rel_objects.append(rel_obj)
+            except ObjectDoesNotExist:
+                print("__get__ ObjectDoesNotExist", ct_id, pk_val)
+                pass
+        self.set_cached_value(instance, rel_objects)
+        return rel_objects
 
     def __set__(self, instance, value):
         instance.__dict__[self.name] = value
